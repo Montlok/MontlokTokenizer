@@ -72,8 +72,9 @@ for token in result.tokens:
 | Total | 65,305 |
 
 All ids fit in 16 bits. Mongolian letters, Mongolian digits and the Mongolian format controls go to the morphology-aware
-BPE, with each control as its own token; the ASCII space is one token; all other characters, Mongolian punctuation
-included, go to the byte-level BPE.
+BPE, with each control as its own token. All other characters, Mongolian punctuation included, go to the byte-level
+BPE. A space before Mongolian text is its own token; a space before other text joins the byte-level token of the word
+after it.
 
 | Group | Special tokens |
 |---|---|

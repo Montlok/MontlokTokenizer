@@ -111,6 +111,20 @@ def special_at(text: str, start: int) -> str | None:
     return None
 
 
+def spaces_joining_general(text: str) -> list[bool]:
+    """For each position, whether it is an ASCII space in a run that general-track text follows. Such spaces go to the
+    byte-level BPE with the word after them, the way it learned words."""
+
+    joins = [False] * len(text)
+    follows = False
+    for j in range(len(text) - 1, -1, -1):
+        if text[j] == " ":
+            joins[j] = follows
+        else:
+            follows = special_at(text, j) is None and contextual_char_lang(text, j) == "general"
+    return joins
+
+
 def segment_by_language(text: str) -> list[Span]:
     if not text:
         return []
@@ -119,6 +133,7 @@ def segment_by_language(text: str) -> list[Span]:
     start = 0
     cur_lang = ""
     i = 0
+    joins_general = spaces_joining_general(text)
 
     while i < len(text):
         special = special_at(text, i)
@@ -133,6 +148,8 @@ def segment_by_language(text: str) -> list[Span]:
             continue
 
         lang = contextual_char_lang(text, i)
+        if lang == "space" and joins_general[i]:
+            lang = "general"
         if not cur_lang:
             cur_lang = lang
             start = i
