@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "montlok-tokenizer"
 version = "0.1.0"
-description = "Tokenizer for traditional Mongolian"
+description = "Tokenizer for autoregressive language models, optimized for traditional Mongolian script"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
