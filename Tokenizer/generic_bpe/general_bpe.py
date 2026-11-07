@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 """General multilingual byte-level BPE track.
 
-A thin wrapper around a HuggingFace ``tokenizers`` byte-level BPE model. The
-*model* is trained by us (no external pretrained weights) and covers every
-non-Mongolian script — Chinese, English, Japanese, Cyrillic Mongolian, digits,
-punctuation, symbols. Byte-level coverage guarantees lossless round-trips and
-never emits ``<unk>``.
+A wrapper around a HuggingFace ``tokenizers`` byte-level BPE model for every script outside the traditional Mongolian
+track: Chinese, English, Japanese, Cyrillic, digits, punctuation and symbols. Byte-level coverage gives an exact round
+trip for any text.
 
 ``tokenizers`` is required for this track (``pip install tokenizers``).
 """
@@ -13,6 +11,19 @@ never emits ``<unk>``.
 from __future__ import annotations
 
 from typing import Iterable
+
+# Pieces the BPE merges within: a word with the space before it (contractions stay with the word, a change from
+# lower to upper case starts a new word), a single digit with the space before it, a run of punctuation or symbols,
+# a run of whitespace.
+PRE_TOKENIZER_PATTERN = (
+    r" ?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?"
+    r"| ?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]+[\p{Ll}\p{Lm}\p{Lo}\p{M}]*(?i:'s|'t|'re|'ve|'m|'ll|'d)?"
+    r"| ?\p{N}"
+    r"| ?[^\s\p{L}\p{N}]+[\r\n/]*"
+    r"|\s*[\r\n]+"
+    r"|\s+(?!\S)"
+    r"|\s+"
+)
 
 
 def _require_tokenizers():
@@ -26,6 +37,19 @@ def _require_tokenizers():
     return tokenizers
 
 
+def byte_level_pre_tokenizer():
+    """Split text with ``PRE_TOKENIZER_PATTERN``, then map each piece to byte-level symbols."""
+    _require_tokenizers()
+    from tokenizers import Regex, pre_tokenizers
+
+    return pre_tokenizers.Sequence(
+        [
+            pre_tokenizers.Split(Regex(PRE_TOKENIZER_PATTERN), behavior="isolated", invert=False),
+            pre_tokenizers.ByteLevel(add_prefix_space=False, trim_offsets=True, use_regex=False),
+        ]
+    )
+
+
 class GeneralBPEModel:
     """Byte-level BPE model wrapper with deterministic local ids and offsets."""
 
@@ -36,22 +60,14 @@ class GeneralBPEModel:
 
     @classmethod
     def minimal(cls) -> "GeneralBPEModel":
-        """A merge-free byte-level model (256 byte tokens, full coverage).
-
-        Used as a training-free fallback. It still requires the ``tokenizers``
-        package (it builds a real ``tokenizers`` byte-level model), but needs no
-        training corpus or merges. It is lossless but uncompressed (one token
-        per byte); real runs train a model with merges.
-        """
+        """A byte-level model with the 256 byte tokens and no merges: one token per byte, full coverage."""
         _require_tokenizers()
         from tokenizers import Tokenizer, decoders, models, pre_tokenizers
 
         alphabet = pre_tokenizers.ByteLevel.alphabet()
         vocab = {ch: i for i, ch in enumerate(sorted(alphabet))}
         tk = Tokenizer(models.BPE(vocab=vocab, merges=[], unk_token=None))
-        tk.pre_tokenizer = pre_tokenizers.ByteLevel(
-            add_prefix_space=False, use_regex=True
-        )
+        tk.pre_tokenizer = byte_level_pre_tokenizer()
         tk.decoder = decoders.ByteLevel()
         return cls(tk)
 
@@ -104,13 +120,12 @@ class GeneralBPETrainer:
         self.show_progress = show_progress
 
     def train(self, texts: Iterable[str]) -> GeneralBPEModel:
+        """Train on ``texts``, each string being text the tokenizer routes to this track."""
         _require_tokenizers()
         from tokenizers import Tokenizer, decoders, models, pre_tokenizers, trainers
 
         tk = Tokenizer(models.BPE(unk_token=None))
-        tk.pre_tokenizer = pre_tokenizers.ByteLevel(
-            add_prefix_space=False, use_regex=True
-        )
+        tk.pre_tokenizer = byte_level_pre_tokenizer()
         tk.decoder = decoders.ByteLevel()
         trainer = trainers.BpeTrainer(
             vocab_size=self.vocab_size,

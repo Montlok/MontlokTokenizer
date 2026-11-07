@@ -9,8 +9,9 @@ script.
 - **Morphology-aware Mongolian segmentation.** Words are cut into stem and suffixes before BPE, using a suffix inventory
   with vowel-harmony rules, and merges stay inside these parts.
 - **Dictionary words as single tokens.** 2,569 Mongolian dictionary words are whole tokens.
-- **Multilingual.** Chinese, English, Cyrillic, digits, punctuation and symbols are handled by a 40,000-token byte-level
-  BPE in the same id space.
+- **Multilingual.** Chinese, English, Cyrillic, Japanese, code, digits, punctuation and symbols are handled by a
+  40,000-token byte-level BPE in the same id space. Common words are single tokens together with the space before
+  them, and numbers are split into single digits.
 - **Exact round trip.** Decoding reproduces the input text exactly, including the Mongolian free variation selectors
   (FVS1–FVS4), the Mongolian vowel separator (MVS) and the narrow no-break space (NNBSP), so Mongolian text keeps its
   GB/T 25914-2023 encoding.
@@ -46,6 +47,14 @@ print([tokenizer.decode([i]) for i in ids])
 
 Each stem and the suffix after the vowel separator are separate tokens, and both words share the token of the suffix
 `ᠤᠨ`.
+
+Text in other scripts is encoded in the same call:
+
+```python
+text = "ᠮᠣᠩᠭᠣᠯ ᠪᠢᠴᠢᠭ, Mongolian script, 蒙古文"
+print([tokenizer.decode([i]) for i in tokenizer.encode(text)])
+# ['ᠮᠣᠩᠭᠣᠯ', ' ', 'ᠪᠢᠴᠢᠭ', ',', ' Mongolian', ' script', ',', ' ', '蒙古', '文']
+```
 
 For a language model, add the sequence markers:
 
@@ -103,13 +112,15 @@ after it.
 from Tokenizer.generic_bpe import GeneralBPETrainer
 from Tokenizer.morphbpe.trainer import MorphBPETrainer
 from Tokenizer.unified.bundle import TokenizerBundle
+from Tokenizer.unified.dual_tokenizer import general_track_texts
 
 texts = [...]  # training text
 MorphBPETrainer(vocab_size=4096).train_to_file(texts, "morphbpe.json")
-GeneralBPETrainer(vocab_size=40000).train(texts).save("general.json")
+GeneralBPETrainer(vocab_size=40000).train(general_track_texts(texts)).save("general.json")
 TokenizerBundle.from_files("morphbpe.json", general_path="general.json").save_dir("my_tokenizer")
 ```
 
+`general_track_texts` gives the byte-level BPE the parts of each text that it encodes.
 `TokenizerBundle.from_dir("my_tokenizer")` then loads the new tokenizer.
 
 ## License

@@ -165,6 +165,16 @@ def segment_by_language(text: str) -> list[Span]:
     return spans
 
 
+def general_track_texts(texts):
+    """Yield the text of every general-track span of ``texts``, cut the way ``encode`` cuts it: the input the
+    byte-level BPE receives, for training it."""
+
+    for text in texts:
+        for span in segment_by_language(text):
+            if span.lang == "general":
+                yield span.text
+
+
 def _general_piece_track(surface: str) -> str:
     """Classify a general-track piece as a word piece or a punctuation piece.
 
@@ -532,5 +542,6 @@ __all__ = [
     "build_unified_vocab",
     "char_lang",
     "contextual_char_lang",
+    "general_track_texts",
     "segment_by_language",
 ]
